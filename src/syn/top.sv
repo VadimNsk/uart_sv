@@ -37,7 +37,12 @@ module automatic top
 //
 //    Settings
 //
-    
+localparam int CLOCK_FREQ_MHz   = 100;
+localparam int MIN_BAUDRATE_Hz  = 600;
+
+localparam int BAUDRATE_RATIO   = CLOCK_FREQ_MHz * 1_000_000 / MIN_BAUDRATE_Hz;
+localparam BIT_PERIOD_WIDTH = $clog2(BAUDRATE_RATIO);
+
 //------------------------------------------------------------------------------
 //
 //    Types
@@ -178,6 +183,16 @@ adder_m adder
     .out ( o   )
  );
 `endif // ADDER_MODULE
+//-------------------------------------------------------------------------------
+uart
+    #(   .CLOCK_FREQ_MHz(CLOCK_FREQ_MHz)
+        ,.MIN_BAUDRATE_Hz(MIN_BAUDRATE_Hz)
+        )
+    uart_inst
+    (    .reset(rst)
+        ,.clock(clk)
+//        ,.bit_count(bit_count)
+        );
 //-------------------------------------------------------------------------------
 endmodule
 //-------------------------------------------------------------------------------
