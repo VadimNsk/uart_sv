@@ -29,7 +29,7 @@ interface trn_if
     typedef enum {waitData, trnData} status_t;
 
     modport master
-    (
+    {
         output logic        reset;
         output logic        clock;
         //
@@ -39,7 +39,7 @@ interface trn_if
         output byte_t       dout;
         output logic        valid;
         input logic         ready
-    );
+    };
 
     modport slave
     (
@@ -52,7 +52,7 @@ interface trn_if
         input byte_t        din;
         input logic         valid;
         output logic        ready
-    );
+    };
 endinterface
 
 //-------------------------------------------------------------------------------

@@ -10,6 +10,8 @@ parameters:
 
 sources:
     - src/syn/top.sv
+    - src/syn/$ADDER_SOURCE
+    - src/syn/$ADDER_IF_SOURCE
     - src/syn/uart.sv
     - src/syn/uart_trn.sv
     - src/syn/uart_rcv.sv
