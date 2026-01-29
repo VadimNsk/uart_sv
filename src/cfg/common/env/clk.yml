@@ -3,7 +3,7 @@ import : board main
 
 parameters:
     REF_CLK             : = board.OSC_FREQ              # MHz
-    MAIN_CLK            : 125                           # MHz   
+    MAIN_CLK            : 100                           # MHz
     CLK_OUT_PHASE_SHIFT : = main.CLK_OUT_PHASE_SHIFT
     DIFF_REFCLK         : = 'yes' if board.DIFF_REFCLK else '__NO_DEFINE__'
                         

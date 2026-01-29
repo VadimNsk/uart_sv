@@ -16,7 +16,7 @@ module top_tb;
 //
 //    Settings
 //
-localparam int CLOCK_FREQ_MHz   = 100;
+localparam int CLOCK_FREQ_MHz   = `REF_CLK;
 localparam int MIN_BAUDRATE_Hz  = 600;
 
 localparam int CLOCK_PERIOD_ns  = 1_000 / CLOCK_FREQ_MHz;
@@ -25,12 +25,16 @@ localparam int BAUDRATE_RATIO   = CLOCK_FREQ_MHz * 1_000_000 / MIN_BAUDRATE_Hz;
 localparam int BIT_PERIOD_WIDTH = $clog2(BAUDRATE_RATIO);
 
 localparam int TEST_BAUDRATE    = 192_000;
+localparam int TEST_BIT_PERIOD  = 1_000_000_000 / TEST_BAUDRATE;
+localparam int TEST_ARRAY_SIZE  = 10;
 
 //------------------------------------------------------------------------------
 //
 //    Types
 //
 typedef logic [BIT_PERIOD_WIDTH-1:0]    bit_period_t;
+typedef uart_trn_pkg::data_t            data_t;
+typedef data_t [0:TEST_ARRAY_SIZE-1]    test_array_t;
 
 //------------------------------------------------------------------------------
 //
@@ -44,9 +48,9 @@ logic rst = 1;
 logic[BIT_PERIOD_WIDTH-1:0]     bit_period  = 1;
 uart_pkg::uart_control_t        control     = '{default:0};
 uart_pkg::uart_status_t         status;
-logic                           TXCI;       // TX Complete Interrupt - Прерывание по завершению передачи
-logic                           RXCI;       // RX Complete Interrupt - Прерывание по завершению приема
-logic                           UDRI;       // Data Register Empty Interrupt - Прерывание по пустому регистру данных
+logic                           TXCI;       // TX Complete Interrupt
+logic                           RXCI;       // RX Complete Interrupt
+logic                           UDRI;       // Data Register Empty Interrupt
 //
 logic                           tx_ready;
 uart_trn_pkg::data_t            tx_din      = 0;
@@ -56,11 +60,11 @@ logic                           rx_ready    = 0;
 uart_rcv_pkg::data_t            rx_dout;
 logic                           rx_valid;
 //
-logic                           TX;         // UART Transmit Data - Передача данных
-logic                           RX = 1;     // UART Receive Data - Прием данных
+logic                           TX;         // UART Transmit Data
+logic                           RX = 1;     // UART Receive Data
 
-uart_trn_pkg::data_t [0:9]      src_data;
-uart_rcv_pkg::data_t [0:9]      dst_data;
+test_array_t                    src_data;
+test_array_t                    dst_data;
 
 int trn_tx_counter  = 0;
 int trn_txc_counter = 0;
@@ -111,13 +115,13 @@ initial begin
 end
 */
 
-task trn_tx_data(input uart_trn_pkg::data_t[0:9] din, output int counter, output done);
+task trn_tx_data(input test_array_t din, output int counter, output done);
     done    = 0;
     counter = 0;
 
     $display("Transmit data...");
 
-    for (int i = 0; i < 10; i = i+1) begin
+    for (int i = 0; i < TEST_ARRAY_SIZE; i = i+1) begin
         do @(posedge clk);
         while(!tx_ready);
 
@@ -154,18 +158,18 @@ task trn_txc_count(input int number, output int counter, output done);
 endtask
 
 
-byte data = 0;
+data_t data = 0;
 
-task rcv_tx_data(output uart_trn_pkg::data_t[0:9] dout, output int counter, output done);
+task rcv_tx_data(output test_array_t dout, output int counter, output done);
     done        = 0;
     counter     = 0;
     bit_strobe  = 0;
 
     $display("Reseive data...");
 
-    for (int i = 0; i < 10; i = i+1) begin
+    for (int i = 0; i < TEST_ARRAY_SIZE; i = i+1) begin
         @(negedge TX);
-        #(1_000_000_000 / TEST_BAUDRATE / 2);
+        #(TEST_BIT_PERIOD / 2);
         if(TX != 0) begin
             $error("Error detecting start bit");
             continue;
@@ -174,20 +178,20 @@ task rcv_tx_data(output uart_trn_pkg::data_t[0:9] dout, output int counter, outp
         bit_strobe      = #10ns 0;
         data = 0;
         for(int j = 0; j < 8; j = j + 1) begin
-            #(1_000_000_000 / TEST_BAUDRATE);
+            #TEST_BIT_PERIOD;
             if(TX)
-                data    = data | (1 << j);
+                data[j] = 1;
             bit_strobe  = 1;
             bit_strobe  = #10ns 0;
         end
-        #(1_000_000_000 / TEST_BAUDRATE);
+        #TEST_BIT_PERIOD;
         bit_strobe      = 1;
         bit_strobe      = #10ns 0;
         if(TX != 1) begin
             $error("Error detecting stop bit");
             continue;
         end
-//      #(1_000_000_000 / TEST_BAUDRATE / 2);
+//      #(TEST_BIT_PERIOD / 2);
         dout[i]         = data;
         counter         = counter + 1;
         $display("%4d. reseive data = %d", counter, data);
@@ -197,22 +201,22 @@ task rcv_tx_data(output uart_trn_pkg::data_t[0:9] dout, output int counter, outp
 endtask
 
 
-task trn_rx_data(input uart_trn_pkg::data_t[0:9] din, output int counter, output done);
+task trn_rx_data(input test_array_t din, output int counter, output done);
     done    = 0;
     counter = 0;
     RX      = 1;
 
     $display("Transmit data...");
 
-    for (int i = 0; i < 10; i = i+1) begin
+    for (int i = 0; i < TEST_ARRAY_SIZE; i = i+1) begin
         RX          = 0;    // start-bit
-        #(1_000_000_000 / TEST_BAUDRATE);
+        #TEST_BIT_PERIOD;
         for (int j = 0; j < 8; j = j+1) begin
             RX  = (din[i] & (1 << j)) ? 1 : 0;
-            #(1_000_000_000 / TEST_BAUDRATE);
+            #TEST_BIT_PERIOD;
         end
         RX          = 1;    // stop-bit
-        #(1_000_000_000 / TEST_BAUDRATE);
+        #TEST_BIT_PERIOD;
         counter     = counter + 1;
         $display("%0d. transmit data[%2d] = %d", counter, i, din[i]);
     end
@@ -221,13 +225,13 @@ task trn_rx_data(input uart_trn_pkg::data_t[0:9] din, output int counter, output
 endtask
 
 
-task rcv_rx_data(output uart_trn_pkg::data_t[0:9] dout, output int counter, output done);
+task rcv_rx_data(output test_array_t dout, output int counter, output done);
     done    = 0;
     counter = 0;
 
     $display("Reseive data...");
 
-    for (int i = 0; i < 10; i = i+1) begin
+    for (int i = 0; i < TEST_ARRAY_SIZE; i = i+1) begin
         do @(posedge clk);
         while(!rx_valid);
 
@@ -278,7 +282,7 @@ initial begin
     tx_valid        = 0;
     rx_ready        = 0;
     //
-    for (int i = 0; i < 10; i = i+1) begin
+    for (int i = 0; i < TEST_ARRAY_SIZE; i = i+1) begin
         src_data[i] = i+1;
         dst_data[i] = 0;
     end
@@ -291,9 +295,9 @@ initial begin
     @(posedge clk);
 
 
-    $display("\n\n>>>>>>>>>>>>>>>>>+<<<<<<<<<<<<<<<<<");
-    $display(">>> ====== Unit test 01 ====== <<<<");
-    $display(">>>>>>>>>>>>>>>>>+<<<<<<<<<<<<<<<<<\n");
+    $display("\n\n>>>>>>>>>>>>>>>+<<<<<<<<<<<<<<<<<<<");
+    $display(">>> ======== Test  TR ======== <<<<");
+    $display(">>>>>>>>>>>>>>>+<<<<<<<<<<<<<<<<<<<\n");
 
     bit_period      = get_bit_period(TEST_BAUDRATE);    // 192000
     control.TXEN    = 1;
@@ -310,7 +314,7 @@ initial begin
     $display("\nCompleted at time = %0t", $time);
     $display("Transmited %0d(%0d), reseived %0d", trn_tx_counter, trn_txc_counter, rcv_tx_counter);
 
-    for (int i = 0; i < 10; i = i+1) begin
+    for (int i = 0; i < TEST_ARRAY_SIZE; i = i+1) begin
         if(src_data[i] != dst_data[i])
             $error("%d. transmit data[%2d] = %dm but reseived data = ", i+1, i, src_data[i], dst_data[i]);
     end
@@ -318,9 +322,9 @@ initial begin
     @(posedge clk);
 
 
-    $display("\n\n>>>>>>>>>>>>>>>>>+<<<<<<<<<<<<<<<<<");
-    $display(">>> ====== Unit test 02 ====== <<<<");
-    $display(">>>>>>>>>>>>>>>>>+<<<<<<<<<<<<<<<<<\n");
+    $display("\n\n>>>>>>>>>>>>>>>+<<<<<<<<<<<<<<<<<<<");
+    $display(">>> ======== Test  RC ======== <<<<");
+    $display(">>>>>>>>>>>>>>>+<<<<<<<<<<<<<<<<<<<\n");
 
     bit_period      = get_bit_period(TEST_BAUDRATE);    // 192000
     control.TXEN    = 0;
@@ -338,7 +342,7 @@ initial begin
     $display("\nCompleted at time = %0t", $time);
     $display("Transmited %0d, reseived %0d(%0d)", trn_rx_counter, rcv_rx_counter, rcv_rxc_counter);
 
-    for (int i = 0; i < 10; i = i+1) begin
+    for (int i = 0; i < TEST_ARRAY_SIZE; i = i+1) begin
         if(src_data[i] != dst_data[i])
             $error("%d. transmit data[%2d] = %dm but reseived data = ", i+1, i, src_data[i], dst_data[i]);
     end
@@ -418,29 +422,29 @@ end
 //    Instances
 //
 top top_inst
-(
-    .rst(rst),
-    .clk(clk)
+    (
+        .rst(rst),
+        .clk(clk)
 
-    // UART
-    ,.bit_period(bit_period)
-    ,.control(control)
-    ,.status(status)
-    ,.TXCI(TXCI)    // TX Complete Interrupt - Прерывание по завершению передачи
-    ,.RXCI(RXCI)    // RX Complete Interrupt - Прерывание по завершению приема
-    ,.UDRI(UDRI)    // Data Register Empty Interrupt - Прерывание по пустому регистру данных
-    //
-    ,.tx_ready(tx_ready)
-    ,.tx_din(tx_din)
-    ,.tx_valid(tx_valid)
-    //
-    ,.rx_ready(rx_ready)
-    ,.rx_dout(rx_dout)
-    ,.rx_valid(rx_valid)
-    //
-    ,.TX(TX)        // UART Transmit Data - Передача данных
-    ,.RX(RX)        // UART Receive Data - Прием данных
-);
+        // UART
+        ,.bit_period(bit_period)
+        ,.control(control)
+        ,.status(status)
+        ,.TXCI(TXCI)    // TX Complete Interrupt
+        ,.RXCI(RXCI)    // RX Complete Interrupt
+        ,.UDRI(UDRI)    // Data Register Empty Interrupt
+        //
+        ,.tx_ready(tx_ready)
+        ,.tx_din(tx_din)
+        ,.tx_valid(tx_valid)
+        //
+        ,.rx_ready(rx_ready)
+        ,.rx_dout(rx_dout)
+        ,.rx_valid(rx_valid)
+        //
+        ,.TX(TX)        // UART Transmit Data
+        ,.RX(RX)        // UART Receive Data
+    );
 
 endmodule
 //-------------------------------------------------------------------------------

@@ -11,7 +11,7 @@
 
 module automatic top
 #(
-     localparam int CLOCK_FREQ_MHz   = 100
+    localparam int CLOCK_FREQ_MHz   = `REF_CLK
     ,localparam int MIN_BAUDRATE_Hz  = 600
 
     ,localparam int MIN_BAUDRATE_RATIO  = CLOCK_FREQ_MHz * 1_000_000 / MIN_BAUDRATE_Hz
@@ -25,9 +25,9 @@ module automatic top
     ,input logic[BIT_PERIOD_WIDTH-1:0]      bit_period
     ,input wire uart_pkg::uart_control_t    control
     ,output uart_pkg::uart_status_t         status
-    ,output logic                           TXCI        // TX Complete Interrupt - Прерывание по завершению передачи
-    ,output logic                           RXCI        // RX Complete Interrupt - Прерывание по завершению приема
-    ,output logic                           UDRI        // Data Register Empty Interrupt - Прерывание по пустому регистру данных
+    ,output logic                           TXCI        // TX Complete Interrupt
+    ,output logic                           RXCI        // RX Complete Interrupt
+    ,output logic                           UDRI        // Data Register Empty Interrupt
     //
     ,output logic                           tx_ready
     ,input uart_trn_pkg::data_t             tx_din
@@ -37,8 +37,8 @@ module automatic top
     ,output uart_rcv_pkg::data_t            rx_dout
     ,output logic                           rx_valid
     //
-    ,output logic                           TX          // UART Transmit Data - Передача данных
-    ,input logic                            RX          // UART Receive Data - Прием данных
+    ,output logic                           TX          // UART Transmit Data
+    ,input logic                            RX          // UART Receive Data
 );
 
 //------------------------------------------------------------------------------
@@ -74,12 +74,20 @@ typedef uart_trn_pkg::data_t            data_t;
 //
 //    Logic
 //
-
+//logic clock;
 
 //------------------------------------------------------------------------------
 //
 //    Instances
 //
+/*
+IBUFG clk_inst
+(
+    .I  ( clk ),
+    .O  ( clock )
+);
+*/
+//assign clock = clk;
 
 uart
     #(   .CLOCK_FREQ_MHz(CLOCK_FREQ_MHz)
@@ -92,9 +100,9 @@ uart
         ,.bit_period(bit_period)
         ,.control(control)
         ,.status(status)
-        ,.TXCI(TXCI)        // TX Complete Interrupt - Прерывание по завершению передачи
-        ,.RXCI(RXCI)        // RX Complete Interrupt - Прерывание по завершению приема
-        ,.UDRI(UDRI)        // Data Register Empty Interrupt - Прерывание по пустому регистру данных
+        ,.TXCI(TXCI)        // TX Complete Interrupt
+        ,.RXCI(RXCI)        // RX Complete Interrupt
+        ,.UDRI(UDRI)        // Data Register Empty Interrupt
         //
         ,.tx_ready(tx_ready)
         ,.tx_din(tx_din)
@@ -104,8 +112,8 @@ uart
         ,.rx_dout(rx_dout)
         ,.rx_valid(rx_valid)
         //
-        ,.TX(TX)            // UART Transmit Data - Передача данных
-        ,.RX(RX)            // UART Receive Data - Прием данных
+        ,.TX(TX)            // UART Transmit Data
+        ,.RX(RX)            // UART Receive Data
     );
 
 //-------------------------------------------------------------------------------

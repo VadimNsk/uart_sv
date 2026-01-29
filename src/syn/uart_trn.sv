@@ -6,8 +6,6 @@
 //
 //-------------------------------------------------------------------------------
 
-//`include "cfg_params.svh"
-
 package uart_trn_pkg;
 
     localparam DATA_WIDTH       = 8;
@@ -38,25 +36,25 @@ module automatic uart_trn
 )
 (    input logic    reset
     ,input logic    clock
-    ,input logic    enable
+//  ,input logic    enable
     //
     ,input logic[BIT_PERIOD_WIDTH-1:0]  bit_period
     //
-    ,output uart_trn_pkg::state_t       state   = uart_trn_pkg::IDLE_STATE
+//  ,output uart_trn_pkg::state_t       state   = uart_trn_pkg::IDLE_STATE
     //
-    ,output logic                       ready   = 0
+    ,output logic                       ready
     ,input uart_trn_pkg::data_t         din
     ,input logic                        valid
     //
-    ,output logic                       TXD     = 1 // UART Transmit Data - Передача данных (выход)
-    ,output logic                       TXC     = 0 // UART Transmit Complete - Передача завершена
+    ,output logic                       TXD             // UART Transmit Data
+    ,output logic                       TXC             // UART Transmit Complete
 );
 
 //------------------------------------------------------------------------------
 //
 //    Settings
 //
-localparam SHIFTER_WIDTH    = uart_trn_pkg::DATA_WIDTH+4;
+localparam SHIFTER_WIDTH    = uart_trn_pkg::DATA_WIDTH+2;
 
 //------------------------------------------------------------------------------
 //
@@ -73,11 +71,12 @@ typedef logic [SHIFTER_WIDTH-1:0]       shifter_t;
 //    Objects
 //
 
-logic           strobe_en   = 0;
-bit_period_t    bit_prd_reg = 0;
-bit_period_t    bit_cnt     = 0;
-logic           bit_strobe  = 0;
-shifter_t       shifter     = -1;
+uart_trn_pkg::state_t   state       = uart_trn_pkg::IDLE_STATE;
+logic                   strobe_en   = 0;
+bit_period_t            bit_prd_reg = 0;
+bit_period_t            bit_cnt     = 0;
+logic                   bit_strobe  = 0;
+shifter_t               shifter     = -1;
 
 //------------------------------------------------------------------------------
 //
@@ -88,6 +87,14 @@ shifter_t       shifter     = -1;
 //
 //    Logic
 //
+/*
+initial begin
+    ready   = 0;
+    //
+    TXD     = 1;    // UART Transmit Data
+    TXC     = 0;    // UART Transmit Complete
+end
+*/
 
 always_ff @(posedge clock, posedge reset) begin
     if(reset) begin
@@ -97,11 +104,10 @@ always_ff @(posedge clock, posedge reset) begin
     else begin
         bit_strobe      <= 0;
         if(!strobe_en) begin
-            bit_cnt     <= 0;//bit_period;
-            bit_prd_reg <= bit_period;
+            bit_cnt     <= 0;//bit_prd_reg;
         end
         else begin
-            assert (bit_period)
+            assert (bit_prd_reg)
                 else $error("Error: bit_period failed at time %0t", $time);
 
             bit_cnt     <= bit_cnt - 1;
@@ -116,7 +122,7 @@ end
 
 always_ff @(posedge clock, posedge reset) begin
     if(reset) begin
-        bit_prd_reg <= 0;
+        bit_prd_reg <= 1;
         strobe_en   <= 0;
         state       <= uart_trn_pkg::IDLE_STATE;
         TXD         <= 1;
@@ -166,7 +172,7 @@ always_ff @(posedge clock, posedge reset) begin
                 end
                 // Если сбой работы командного автомата и выход за диапазон допустимых состояний
                 assert (state <= uart_trn_pkg::STOP_BIT_STATE)
-                    else $error("Error: bit_period failed at time %0t", $time);
+                    else $error("Error: state = %0d is failed at time %0t", state, $time);
                 if(state > uart_trn_pkg::STOP_BIT_STATE) begin
                     state       <= uart_trn_pkg::IDLE_STATE;
                     strobe_en   <= 0;

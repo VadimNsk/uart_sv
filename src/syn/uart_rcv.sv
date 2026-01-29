@@ -6,8 +6,6 @@
 //
 //-------------------------------------------------------------------------------
 
-//`include "cfg_params.svh"
-
 package uart_rcv_pkg;
 
     localparam  DATA_WIDTH          = 8;
@@ -43,55 +41,66 @@ module automatic uart_rcv
     //
     ,input logic[BIT_PERIOD_WIDTH-1:0]  bit_period
     //
-    ,output uart_rcv_pkg::state_t       state   = uart_rcv_pkg::IDLE_STATE
+//  ,output uart_rcv_pkg::state_t       state   = uart_rcv_pkg::IDLE_STATE
     //
     ,input logic                        ready
-    ,output uart_rcv_pkg::data_t        dout    = 0
-    ,output logic                       valid   = 0
+    ,output uart_rcv_pkg::data_t        dout
+    ,output logic                       valid
     //
-    ,input logic                        RXD         // UART Receive Data - Прием данных (вход)
-    ,output logic                       RXC     = 0 // UART Receive Complete - Прием завершен
-    ,output logic                       FE      = 0 // UART Framing Error - Ошибка кадра
-    ,output logic                       DOR     = 0 // UART Data OverRun - Переполнение данных
+    ,input logic                        RXD             // UART Receive Data
+    ,output logic                       RXC             // UART Receive Complete
+    ,output logic                       FE              // UART Framing Error
+    ,output logic                       DOR             // UART Data OverRun
 );
 
 //------------------------------------------------------------------------------
 //
 //    Settings
 //
+localparam SHIFTER_WIDTH    = uart_trn_pkg::DATA_WIDTH+1;
 
 //------------------------------------------------------------------------------
 //
 //    Types
 //
-typedef logic [BIT_PERIOD_WIDTH-1:0]            bit_period_t;
+typedef logic [BIT_PERIOD_WIDTH-1:0]    bit_period_t;
 
-typedef uart_rcv_pkg::state_t                   state_t;
+typedef uart_rcv_pkg::state_t           state_t;
 
-typedef logic [uart_rcv_pkg::DATA_WIDTH+2:0]    shifter_t;
+typedef logic [SHIFTER_WIDTH-1:0]       shifter_t;
 
 //------------------------------------------------------------------------------
 //
 //    Objects
 //
 
-logic           strobe_en   = 0;
-bit_period_t    bit_prd_reg = 0;
-bit_period_t    bit_cnt     = 0;
-logic           bit_strobe  = 0;
-shifter_t       shifter     = -1;
-logic[3:0]      RXdff       = -1;
+uart_rcv_pkg::state_t   state       = uart_rcv_pkg::IDLE_STATE;
+logic                   strobe_en   = 0;
+bit_period_t            bit_prd_reg = 0;
+bit_period_t            bit_cnt     = 0;
+logic                   bit_strobe  = 0;
+shifter_t               shifter     = -1;
+logic[3:0]              RXdff       = -1;
 
 //------------------------------------------------------------------------------
 //
 //    Functions and tasks
 //
-localparam SHIFTER_WIDTH    = uart_trn_pkg::DATA_WIDTH+1;
 
 //------------------------------------------------------------------------------
 //
 //    Logic
 //
+/*
+initial begin
+    dout        = 0;
+    valid       = 0;
+    //
+    RXC         = 0;        // UART Receive Complete
+    FE          = 0;        // UART Framing Error
+    DOR         = 0;        // UART Data OverRun
+end
+*/
 
 always_ff @(posedge clock, posedge reset) begin
     if(reset) begin
@@ -101,11 +110,10 @@ always_ff @(posedge clock, posedge reset) begin
     else begin
         bit_strobe      <= 0;
         if(!strobe_en) begin
-            bit_cnt     <= {1'b0, bit_period[BIT_PERIOD_WIDTH-1:1]};
-            bit_prd_reg <= bit_period;
+            bit_cnt     <= {1'b0, bit_prd_reg[BIT_PERIOD_WIDTH-1:1]};
         end
         else begin
-            assert (bit_period)
+            assert (bit_prd_reg)
                 else $error("Error: bit_period failed at time %0t", $time);
 
             bit_cnt     <= bit_cnt - 1;
@@ -118,16 +126,17 @@ always_ff @(posedge clock, posedge reset) begin
 end
 
 
-always_ff @(posedge clock, posedge reset)
+always_ff @(posedge clock, posedge reset) begin
     if(reset)
         RXdff       <= -1;
     else
         RXdff       <= {RXdff[2:0], RXD};
+end
 
 
 always_ff @(posedge clock, posedge reset) begin
     if(reset) begin
-        bit_prd_reg <= 0;
+        bit_prd_reg <= 1;
         strobe_en   <= 0;
         state       <= uart_rcv_pkg::IDLE_STATE;
         shifter     <= -1;
@@ -179,9 +188,6 @@ always_ff @(posedge clock, posedge reset) begin
                 if(bit_strobe) begin
                     state           <= uart_rcv_pkg::DATA_OUT_STATE;
                     strobe_en       <= 0;
-//                  dout            <= shifter[uart_rcv_pkg::DATA_WIDTH-1:0];
-//                  valid           <= 1;
-//                  DOR             <= (valid && !ready);   // переполнение данных, когда
                     FE              <= 0;                   // сброс ошибки кадра
                     if(~RXdff)                              // стоповый бит зашумлен или имеет низкий уровень
                         FE          <= 1;                   // ошибка кадра
@@ -211,7 +217,7 @@ always_ff @(posedge clock, posedge reset) begin
                 end
                 // Если сбой работы командного автомата и выход за диапазон допустимых состояний
                 assert (state <= uart_rcv_pkg::FINISH_STATE)
-                    else $error("Error: bit_period failed at time %0t", $time);
+                    else $error("Error: state = %0d is failed at time %0t", state, $time);
                 if(state > uart_rcv_pkg::FINISH_STATE) begin
                     state           <= uart_rcv_pkg::IDLE_STATE;
                     strobe_en       <= 0;
