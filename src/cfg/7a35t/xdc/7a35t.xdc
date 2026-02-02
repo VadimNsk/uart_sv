@@ -46,16 +46,21 @@ set_output_delay -clock clk_ext -max 0.0 [get_ports {status[*] TXCI RXCI UDRI tx
 
 set_property PACKAGE_PIN R10 [get_ports rst]
 set_property PACKAGE_PIN E3  [get_ports clk]
-
+#
 set_property PACKAGE_PIN K17 [get_ports TX]
 set_property PACKAGE_PIN K18 [get_ports RX]
-
-set_property PACKAGE_PIN L13 [get_ports {control[RXCIE]}]
-set_property PACKAGE_PIN L14 [get_ports {control[TXCIE]}]
-set_property PACKAGE_PIN L15 [get_ports {control[UDRIE]}]
-set_property PACKAGE_PIN L16 [get_ports {control[RXEN]}]
-set_property PACKAGE_PIN L18 [get_ports {control[TXEN]}]
-
+#
+#set_property PACKAGE_PIN L13 [get_ports {control[RXCIE]}]
+set_property PACKAGE_PIN L13 [get_ports {control[0]}]
+#set_property PACKAGE_PIN L14 [get_ports {control[TXCIE]}]
+set_property PACKAGE_PIN L14 [get_ports {control[1]}]
+#set_property PACKAGE_PIN L15 [get_ports {control[UDRIE]}]
+set_property PACKAGE_PIN L15 [get_ports {control[2]}]
+#set_property PACKAGE_PIN L16 [get_ports {control[RXEN]}]
+set_property PACKAGE_PIN L16 [get_ports {control[3]}]
+#set_property PACKAGE_PIN L18 [get_ports {control[TXEN]}]
+set_property PACKAGE_PIN L18 [get_ports {control[4]}]
+#
 #set_property PACKAGE_PIN M13 [get_ports {status[RXC]}]
 set_property PACKAGE_PIN M13 [get_ports {status[0]}]
 #set_property PACKAGE_PIN M14 [get_ports {status[TXC]}]
@@ -66,11 +71,11 @@ set_property PACKAGE_PIN M16 [get_ports {status[2]}]
 set_property PACKAGE_PIN M17 [get_ports {status[3]}]
 #set_property PACKAGE_PIN M18 [get_ports {status[DOR]}]
 set_property PACKAGE_PIN M18 [get_ports {status[4]}]
-
+#
 set_property PACKAGE_PIN N14 [get_ports TXCI]
 set_property PACKAGE_PIN N15 [get_ports RXCI]
 set_property PACKAGE_PIN N16 [get_ports UDRI]
-
+#
 set_property PACKAGE_PIN P14 [get_ports {bit_period[0]}]
 set_property PACKAGE_PIN P15 [get_ports {bit_period[1]}]
 set_property PACKAGE_PIN P17 [get_ports {bit_period[2]}]
@@ -135,10 +140,14 @@ set_property IOB true [get_ports {tx_din[*]}]
 #set_property IOB true [get_ports rx_ready]
 set_property IOB true [get_ports {rx_dout[*]}]
 #set_property IOB true [get_ports rx_valid]
-#set_property IOB true [get_ports {status[*]}]
-set_property IOB true [get_ports {status[UDRE]}]
-set_property IOB true [get_ports {status[FE]}]
-set_property IOB true [get_ports {status[DOR]}]
+#
+#set_property IOB true [get_ports {status[UDRE]}]
+set_property IOB true [get_ports {status[2]}]
+#set_property IOB true [get_ports {status[FE]}]
+set_property IOB true [get_ports {status[3]}]
+#set_property IOB true [get_ports {status[DOR]}]
+set_property IOB true [get_ports {status[4]}]
+#
 set_property IOB true [get_ports TXCI]
 set_property IOB true [get_ports RXCI]
 set_property IOB true [get_ports UDRI]

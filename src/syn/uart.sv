@@ -9,11 +9,11 @@
 package uart_pkg;
 
     typedef struct packed
-    {   logic RXC;      // UART Receive Complete - Прием завершен
-        logic TXC;      // UART Transmit Complete - Передача завершена
-        logic UDRE;     // UART Data Register Empty - Регистр данных пуст
-        logic FE;       // UART Framing Error - Ошибка кадра
-        logic DOR;      // UART Data OverRun - Переполнение данных
+    {   logic RXC;      // UART Receive Complete
+        logic TXC;      // UART Transmit Complete
+        logic UDRE;     // UART Data Register Empty
+        logic FE;       // UART Framing Error
+        logic DOR;      // UART Data OverRun
 //      logic reserved[2:0];
     } uart_status_t;
 
@@ -71,7 +71,8 @@ module automatic uart
 //    Types
 //
 typedef logic [BIT_PERIOD_WIDTH-1:0]    bit_count_t;
-typedef uart_trn_pkg::data_t            data_t;
+//typedef uart_trn_pkg::data_t            data_t;
+//import uart_trn_pkg::data_t;
 
 //------------------------------------------------------------------------------
 //
@@ -81,10 +82,10 @@ typedef uart_trn_pkg::data_t            data_t;
 //uart_trn_pkg::state_t   tx_state;
 //uart_rcv_pkg::state_t   rx_state;
 
-data_t  tx_UDR;         // UART I/O Data Register
-logic tx_UDR_valid;
-data_t  rx_UDR;         // UART I/O Data Register
-logic rx_UDR_valid;
+uart_trn_pkg::data_t    tx_UDR;                 // UART I/O Data Register
+logic                   tx_UDR_valid;
+uart_rcv_pkg::data_t    rx_UDR;                 // UART I/O Data Register
+logic                   rx_UDR_valid;
 
 logic                   uart_trn_enable;
 logic                   uart_trn_ready;
@@ -98,6 +99,15 @@ uart_rcv_pkg::data_t    uart_rcv_dout;
 logic                   uart_rcv_valid;
 logic                   uart_rcv_DOR;
 logic                   uart_rcv_RXC;
+
+logic                   status_UDRE     = 0;    // UART Data Register Empty
+logic                   status_DOR      = 0;    // UART Data OverRun
+logic                   TXCI_reg        = 0;    // TX Complete Interrupt
+logic                   RXCI_reg        = 0;    // RX Complete Interrupt
+logic                   UDRI_reg        = 0;    // Data Register Empty Interrupt
+logic                   tx_ready_reg    = 0;
+uart_rcv_pkg::data_t    rx_dout_reg     = 0;
+logic                   rx_valid_reg    = 0;
 
 //------------------------------------------------------------------------------
 //
@@ -113,24 +123,19 @@ logic                   uart_rcv_RXC;
 //
 //    Logic
 //
-/*
-initial begin
-    status      = '{default:0};
-    TXCI        = 0;    // TX Complete Interrupt
-    RXCI        = 0;    // RX Complete Interrupt
-    UDRI        = 0;    // Data Register Empty Interrupt
-    //
-    tx_ready    = 0;
-    //
-    rx_dout     = 0;
-    rx_valid    = 0;
-    //
-    TX          = 0;    // UART Transmit Data
-end
-*/
+
+assign status.UDRE  = status_UDRE;  // UART Data Register Empty
+assign status.DOR   = status_DOR;   // UART Data OverRun
+assign TXCI         = TXCI_reg;     // TX Complete Interrupt
+assign RXCI         = RXCI_reg;     // RX Complete Interrupt
+assign UDRI         = UDRI_reg;     // Data Register Empty Interrupt
+assign tx_ready     = tx_ready_reg;
+assign rx_dout      = rx_dout_reg;
+assign rx_valid     = rx_valid_reg;
+
 
 always_comb begin
-    tx_ready            <= ~tx_UDR_valid && uart_trn_enable;
+    tx_ready_reg        <= ~tx_UDR_valid && uart_trn_enable;
 end
 
 always_ff @(posedge clock, posedge reset) begin
@@ -142,23 +147,23 @@ always_ff @(posedge clock, posedge reset) begin
         uart_trn_din    <= 0;
         uart_trn_valid  <= 0;
         //
-        TXCI            <= 0;       // TX Complete Interrupt
+        TXCI_reg        <= 0;       // TX Complete Interrupt
         uart_trn_TXC    <= 0;
         //
-        status.UDRE     <= 0;       // UART Data Register Empty
-        UDRI            <= 0;       // Data Register Empty Interrupt
+        status_UDRE     <= 0;       // UART Data Register Empty
+        UDRI_reg        <= 0;       // Data Register Empty Interrupt
         prev_UDR_valid  <= 0;
     end
     else begin
-        TXCI            <= 0;       // TX Complete Interrupt
+        TXCI_reg        <= 0;       // TX Complete Interrupt
         uart_trn_TXC    <= status.TXC;
         if({uart_trn_TXC, status.TXC} == 2'b01 && control.TXCIE)
-            TXCI        <= 1;       // TX Complete Interrupt
+            TXCI_reg    <= 1;       // TX Complete Interrupt
 
-        UDRI            <= 0;       // Data Register Empty Interrupt
+        UDRI_reg        <= 0;       // Data Register Empty Interrupt
         prev_UDR_valid  <= tx_UDR_valid;
         if({prev_UDR_valid, tx_UDR_valid} == 2'b10 && control.UDRIE)
-            UDRI        <= 1;       // Data Register Empty Interrupt
+            UDRI_reg    <= 1;       // Data Register Empty Interrupt
 
         // Включение передатчика в любое время.
         if(!uart_trn_enable)
@@ -181,15 +186,15 @@ always_ff @(posedge clock, posedge reset) begin
                 tx_UDR          <= tx_din;
                 tx_UDR_valid    <= tx_valid;
             end
-            status.UDRE         <= !(tx_UDR_valid || tx_valid); // UART Data Register Empty
+            status_UDRE         <= !(tx_UDR_valid || tx_valid); // UART Data Register Empty
         end
     end
 end
 
 
 always_comb begin
-    rx_dout     <= rx_UDR;
-    rx_valid    <= rx_UDR_valid;
+    rx_dout_reg     <= rx_UDR;
+    rx_valid_reg    <= rx_UDR_valid;
 end
 
 always_ff @(posedge clock, posedge reset) begin
@@ -199,30 +204,30 @@ always_ff @(posedge clock, posedge reset) begin
         //
         uart_rcv_ready  <= 0;
         //
-        status.DOR      <= 0;       // UART Data OverRun
+        status_DOR      <= 0;       // UART Data OverRun
         //
         uart_rcv_RXC    <= 0;
-        RXCI            <= 0;       // RX Complete Interrupt
+        RXCI_reg        <= 0;       // RX Complete Interrupt
     end
     else begin
-        RXCI            <= 0;
+        RXCI_reg        <= 0;
         uart_rcv_RXC    <= status.RXC;
         if({uart_rcv_RXC, status.RXC} == 2'b01 && control.RXCIE)
-            RXCI        <= 1;       // RX Complete Interrupt
+            RXCI_reg    <= 1;       // RX Complete Interrupt
 
         uart_rcv_ready  <= 1;
 
         if(rx_ready && rx_UDR_valid) begin      // данные с выхода должны быть считаны в течение 1 такта
             rx_UDR_valid        <= 0;
-            status.DOR          <= 0;           // сброс флага переполнения данных при чтении данных
+            status_DOR          <= 0;           // сброс флага переполнения данных при чтении данных
         end
 
         if(uart_rcv_valid) begin
             rx_UDR              <= uart_rcv_dout;
             rx_UDR_valid        <= 1;
-            status.DOR          <= uart_rcv_DOR;
+            status_DOR          <= uart_rcv_DOR;
             if(rx_UDR_valid && !rx_ready) begin
-                status.DOR      <= 1;
+                status_DOR      <= 1;
             end
         end
     end

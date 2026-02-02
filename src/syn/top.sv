@@ -22,9 +22,9 @@ module automatic top
     input logic         clk
 
     // UART
-    ,input logic[BIT_PERIOD_WIDTH-1:0]      bit_period
-    ,input wire uart_pkg::uart_control_t    control
-    ,output uart_pkg::uart_status_t         status
+    ,input logic[BIT_PERIOD_WIDTH-1:0]                  bit_period
+    ,input wire[0:$size(uart_pkg::uart_control_t)-1]    control
+    ,output wire[0:$size(uart_pkg::uart_status_t)-1]    status
     ,output logic                           TXCI        // TX Complete Interrupt
     ,output logic                           RXCI        // RX Complete Interrupt
     ,output logic                           UDRI        // Data Register Empty Interrupt
@@ -51,12 +51,15 @@ module automatic top
 //    Types
 //
 typedef logic [BIT_PERIOD_WIDTH-1:0]    bit_period_t;
-typedef uart_trn_pkg::data_t            data_t;
+//typedef uart_trn_pkg::data_t            data_t;
+//import uart_trn_pkg::data_t;
 
 //------------------------------------------------------------------------------
 //
 //    Objects
 //
+uart_pkg::uart_control_t    control_reg;
+uart_pkg::uart_status_t     status_reg;
 
 
 //------------------------------------------------------------------------------
@@ -74,7 +77,12 @@ typedef uart_trn_pkg::data_t            data_t;
 //
 //    Logic
 //
+
 //logic clock;
+
+assign control_reg  = control;
+assign status       = status_reg;
+
 
 //------------------------------------------------------------------------------
 //
@@ -98,8 +106,8 @@ uart
         ,.clock(clk)
         // UART
         ,.bit_period(bit_period)
-        ,.control(control)
-        ,.status(status)
+        ,.control(control_reg)
+        ,.status(status_reg)
         ,.TXCI(TXCI)        // TX Complete Interrupt
         ,.RXCI(RXCI)        // RX Complete Interrupt
         ,.UDRI(UDRI)        // Data Register Empty Interrupt

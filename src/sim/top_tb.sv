@@ -33,7 +33,8 @@ localparam int TEST_ARRAY_SIZE  = 10;
 //    Types
 //
 typedef logic [BIT_PERIOD_WIDTH-1:0]    bit_period_t;
-typedef uart_trn_pkg::data_t            data_t;
+//typedef uart_trn_pkg::data_t            data_t;
+import uart_trn_pkg::data_t;
 typedef data_t [0:TEST_ARRAY_SIZE-1]    test_array_t;
 
 //------------------------------------------------------------------------------
@@ -46,7 +47,7 @@ logic rst = 1;
 
 // UART
 logic[BIT_PERIOD_WIDTH-1:0]     bit_period  = 1;
-uart_pkg::uart_control_t        control     = '{default:0};
+uart_pkg::uart_control_t        control     = '{TXEN:'0, RXEN:'0, default:'0};
 uart_pkg::uart_status_t         status;
 logic                           TXCI;       // TX Complete Interrupt
 logic                           RXCI;       // RX Complete Interrupt
@@ -92,7 +93,6 @@ begin
     get_bit_period = CLOCK_FREQ_MHz * 1_000_000 / baudrate;
 end
 endfunction
-
 
 //------------------------------------------------------------------------------
 //

@@ -29,6 +29,7 @@ endpackage : uart_trn_pkg
 
 
 module automatic uart_trn
+    import uart_trn_pkg::*;
 #(   parameter CLOCK_FREQ_MHz       = 100
     ,parameter MIN_BAUDRATE_Hz      = 600
     ,localparam MIN_BAUDRATE_RATIO  = CLOCK_FREQ_MHz * 1_000_000 / MIN_BAUDRATE_Hz
@@ -40,10 +41,10 @@ module automatic uart_trn
     //
     ,input logic[BIT_PERIOD_WIDTH-1:0]  bit_period
     //
-//  ,output uart_trn_pkg::state_t       state   = uart_trn_pkg::IDLE_STATE
+//  ,output state_t                     state   = IDLE_STATE
     //
     ,output logic                       ready
-    ,input uart_trn_pkg::data_t         din
+    ,input data_t                       din
     ,input logic                        valid
     //
     ,output logic                       TXD             // UART Transmit Data
@@ -54,15 +55,13 @@ module automatic uart_trn
 //
 //    Settings
 //
-localparam SHIFTER_WIDTH    = uart_trn_pkg::DATA_WIDTH+2;
+localparam SHIFTER_WIDTH    = DATA_WIDTH+2;
 
 //------------------------------------------------------------------------------
 //
 //    Types
 //
 typedef logic [BIT_PERIOD_WIDTH-1:0]    bit_period_t;
-
-typedef uart_trn_pkg::state_t           state_t;
 
 typedef logic [SHIFTER_WIDTH-1:0]       shifter_t;
 
@@ -71,12 +70,16 @@ typedef logic [SHIFTER_WIDTH-1:0]       shifter_t;
 //    Objects
 //
 
-uart_trn_pkg::state_t   state       = uart_trn_pkg::IDLE_STATE;
+state_t                 state       = IDLE_STATE;
 logic                   strobe_en   = 0;
 bit_period_t            bit_prd_reg = 0;
 bit_period_t            bit_cnt     = 0;
 logic                   bit_strobe  = 0;
 shifter_t               shifter     = -1;
+
+logic                   ready_reg   = 0;
+logic                   TXD_reg     = 0;    // UART Transmit Data
+logic                   TXC_reg     = 0;    // UART Transmit Complete
 
 //------------------------------------------------------------------------------
 //
@@ -87,14 +90,11 @@ shifter_t               shifter     = -1;
 //
 //    Logic
 //
-/*
-initial begin
-    ready   = 0;
-    //
-    TXD     = 1;    // UART Transmit Data
-    TXC     = 0;    // UART Transmit Complete
-end
-*/
+
+assign ready        = ready_reg;
+assign TXD          = TXD_reg;              // UART Transmit Data
+assign TXC          = TXC_reg;              // UART Transmit Complete
+
 
 always_ff @(posedge clock, posedge reset) begin
     if(reset) begin
@@ -122,17 +122,17 @@ end
 
 always_ff @(posedge clock, posedge reset) begin
     if(reset) begin
-        bit_prd_reg <= 1;
-        strobe_en   <= 0;
-        state       <= uart_trn_pkg::IDLE_STATE;
-        TXD         <= 1;
-        shifter     <= -1;
-        ready       <= 0;
-        TXC         <= 0;
+        bit_prd_reg     <= 1;
+        strobe_en       <= 0;
+        state           <= IDLE_STATE;
+        TXD_reg         <= 1;
+        shifter         <= -1;
+        ready_reg       <= 0;
+        TXC_reg         <= 0;
     end
     else begin
         if(bit_strobe) begin
-            TXD         <= shifter[0];
+            TXD_reg     <= shifter[0];
             shifter     <= {1'b1, shifter[SHIFTER_WIDTH-1:1]};
         end
 
@@ -140,43 +140,43 @@ always_ff @(posedge clock, posedge reset) begin
         // Т.е. состояние START_BIT_STATE действует до строба переключения на передачу 0-го бита,
         // а состояние STOP_BIT_STATE действует до конца стопбита, т.е. до окончания транзакции
         case(state)
-            uart_trn_pkg::IDLE_STATE: begin
+            IDLE_STATE: begin
                 strobe_en       <= 0;
                 bit_prd_reg     <= bit_period;
-                ready           <= 1;
-                TXD             <= 1;
-                if(valid && ready) begin
-                    state       <= uart_trn_pkg::START_STATE;
+                ready_reg       <= 1;
+                TXD_reg         <= 1;
+                if(valid && ready_reg) begin
+                    state       <= START_STATE;
                     strobe_en   <= 1;
 
                     shifter     <= {-1, din, 1'b0};
-                    ready       <= 0;
-                    TXC         <= 0;
+                    ready_reg   <= 0;
+                    TXC_reg     <= 0;
                 end
             end
             //
-            uart_trn_pkg::STOP_BIT_STATE:
+            STOP_BIT_STATE:
                 if(bit_strobe) begin
-                    state       <= uart_trn_pkg::IDLE_STATE;
+                    state       <= IDLE_STATE;
                     strobe_en   <= 0;
-                    TXC         <= 1;
+                    TXC_reg     <= 1;
                 end
             //
             default: begin
                 if(bit_strobe) begin
                     state       <= state + 1;
-                    if(state == uart_trn_pkg::STOP_BIT_STATE) begin
-                        state   <= uart_trn_pkg::IDLE_STATE;
+                    if(state == STOP_BIT_STATE) begin
+                        state   <= IDLE_STATE;
                         strobe_en   <= 0;
                     end
                 end
                 // Если сбой работы командного автомата и выход за диапазон допустимых состояний
-                assert (state <= uart_trn_pkg::STOP_BIT_STATE)
+                assert (state <= STOP_BIT_STATE)
                     else $error("Error: state = %0d is failed at time %0t", state, $time);
-                if(state > uart_trn_pkg::STOP_BIT_STATE) begin
-                    state       <= uart_trn_pkg::IDLE_STATE;
+                if(state > STOP_BIT_STATE) begin
+                    state       <= IDLE_STATE;
                     strobe_en   <= 0;
-                    TXD         <= 1;
+                    TXD_reg     <= 1;
                 end
             end
         endcase
