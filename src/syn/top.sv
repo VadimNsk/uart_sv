@@ -18,8 +18,8 @@ module automatic top
 
     // UART
     input  logic [     BIT_PERIOD_WIDTH-1:0] bit_period,
-    input  wire  [$size(uart_control_t)-1:0] control,
-    output wire  [ $size(uart_status_t)-1:0] status,
+    input  var   [$size(uart_control_t)-1:0] control,
+    output var   [ $size(uart_status_t)-1:0] status,
     output logic                             TXCI,        // TX Complete Interrupt
     output logic                             RXCI,        // RX Complete Interrupt
     output logic                             UDRI,        // Data Register Empty Interrupt
@@ -50,8 +50,8 @@ module automatic top
 //
 //    Objects
 //
-uart_control_t    control_reg;
-uart_status_t     status_reg;
+control_t control_reg;
+status_t  status_reg;
 
 
 //------------------------------------------------------------------------------
@@ -72,8 +72,8 @@ uart_status_t     status_reg;
 
 //logic clock;
 
-assign control_reg  = control;
-assign status       = status_reg;
+assign control_reg = control;
+assign status      = status_reg;
 
 
 //------------------------------------------------------------------------------

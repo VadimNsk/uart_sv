@@ -7,6 +7,10 @@
 //-------------------------------------------------------------------------------
 
 `include "cfg_params.svh"
+//`include "uart_wrapper_wif.sv"
+`include "uart.sv"
+`include "uart_if.sv"
+`include "testcase.sv"
 
 `timescale 1ns/1ps
 
@@ -18,18 +22,33 @@ import uart_pkg::*;
 //
 //    Settings
 //
-localparam int CLOCK_PERIOD_ns  = 1_000 / CLOCK_FREQ_MHz;
-
-localparam int TEST_BAUDRATE    = 192_000;
-localparam int TEST_BIT_PERIOD  = 1_000_000_000 / TEST_BAUDRATE;
 localparam int TEST_ARRAY_SIZE  = 10;
+
+//`define TB_SYN_STYLE
+//`define TB_SIMPLE_STYLE
+`define TB_ENVIRONMENT_STYLE
+
+`ifdef TB_ENVIRONMENT_STYLE
+    `undef TB_SYN_STYLE
+    `undef TB_SIMPLE_STYLE
+`elsif TB_SIMPLE_STYLE
+    `undef TB_SYN_STYLE
+    `undef TB_ENVIRONMENT_STYLE
+`elsif TB_SYN_STYLE
+    `undef TB_SIMPLE_STYLE
+    `undef TB_ENVIRONMENT_STYLE
+`endif //TB_SYN_STYLE, TB_SIMPLE_STYLE, TB_ENVIRONMENT_STYLE
+
 
 //------------------------------------------------------------------------------
 //
 //    Types
 //
-typedef logic  [BIT_PERIOD_WIDTH-1:0                ] bit_period_t;
-typedef data_t [                 0:TEST_ARRAY_SIZE-1] test_array_t;
+`ifndef TB_ENVIRONMENT_STYLE
+
+typedef data_t[0:TEST_ARRAY_SIZE-1] test_array_t;
+
+`endif //TB_ENVIRONMENT_STYLE
 
 //------------------------------------------------------------------------------
 //
@@ -39,59 +58,121 @@ logic clk = 0;
 logic rst = 1;
 
 
-// UART
-logic[BIT_PERIOD_WIDTH-1:0] bit_period      = 1;
-uart_control_t              control         = '{TXEN:'0, RXEN:'0, default:'0};
-uart_status_t               status;
-logic                       TXCI;                   // TX Complete Interrupt
-logic                       RXCI;                   // RX Complete Interrupt
-logic                       UDRI;                   // Data Register Empty Interrupt
+`ifdef TB_ENVIRONMENT_STYLE
+
+uart_if uart_if0(clk, rst);
+
+testcase TC (uart_if0.drv, uart_if0.rcv);
+
+`endif //TB_ENVIRONMENT_STYLE
+
+`ifndef TB_ENVIRONMENT_STYLE
+
+bit_period_t bit_period      = 1;
+control_t    control         = '{TXEN:'0, RXEN:'0, default:'0};
+status_t     status;
+logic        TXCI;                  // TX Complete Interrupt
+logic        RXCI;                  // RX Complete Interrupt
+logic        UDRI;                  // Data Register Empty Interrupt
 //
-logic                       tx_ready;
-data_t                      tx_din          = 0;
-logic                       tx_valid        = 0;
+logic        tx_ready;
+data_t       tx_din          = 0;
+logic        tx_valid        = 0;
 //
-logic                       rx_ready        = 0;
-data_t                      rx_dout;
-logic                       rx_valid;
+logic        rx_ready        = 0;
+data_t       rx_dout;
+logic        rx_valid;
 //
-logic                       TX;                     // UART Transmit Data
-logic                       RX              = 1;    // UART Receive Data
+logic        TX;                    // UART Transmit Data
+logic        RX              = 1;   // UART Receive Data
 
-test_array_t                src_data;
-test_array_t                dst_data;
+test_array_t src_data;
+test_array_t dst_data;
 
-int                         trn_tx_counter  = 0;
-int                         trn_txc_counter = 0;
-int                         rcv_tx_counter  = 0;
-bit                         trn_tx_done     = 0;
-bit                         trn_txc_done    = 0;
-bit                         rcv_tx_done     = 0;
+int          trn_tx_counter  = 0;
+int          trn_txc_counter = 0;
+int          rcv_tx_counter  = 0;
+bit          trn_tx_done     = 0;
+bit          trn_txc_done    = 0;
+bit          rcv_tx_done     = 0;
 
-bit                         bit_strobe      = 0;
+bit          bit_strobe      = 0;
 
-int                         trn_rx_counter  = 0;
-int                         rcv_rx_counter  = 0;
-int                         rcv_rxc_counter = 0;
-bit                         trn_rx_done     = 0;
-bit                         rcv_rx_done     = 0;
-bit                         rcv_rxc_done    = 0;
+int          trn_rx_counter  = 0;
+int          rcv_rx_counter  = 0;
+int          rcv_rxc_counter = 0;
+bit          trn_rx_done     = 0;
+bit          rcv_rx_done     = 0;
+bit          rcv_rxc_done    = 0;
+
+`endif //TB_ENVIRONMENT_STYLE
 
 
 //------------------------------------------------------------------------------
 //
 //    Functions and tasks
 //
-function bit_period_t get_bit_period (input int baudrate);
-begin
-    get_bit_period = CLOCK_FREQ_MHz * 1_000_000 / baudrate;
-end
-endfunction
+
+`ifdef TB_ENVIRONMENT_STYLE
+
+
+
+`endif //TB_ENVIRONMENT_STYLE
+
 
 //------------------------------------------------------------------------------
 //
 //    Logic
 //
+
+always #(CLOCK_PERIOD_ns/2) clk = ~clk;
+
+
+`ifdef TB_ENVIRONMENT_STYLE
+
+data_t readed;
+logic valid;
+
+initial begin
+    rst = 1;
+    uart_if0.bit_period = get_bit_period(TEST_BAUDRATE);    // 192000
+    uart_if0.control    = '{TXEN     : 0,
+                            RXEN     : 0,
+                            TXCIE    : 0,
+                            RXCIE    : 0,
+                            TXDREIE  : 0,
+                            RXDRNEIE : 0};
+    uart_if0.tx_din     = 0;
+    uart_if0.tx_valid   = 0;
+    uart_if0.rx_ready   = 0;
+    uart_if0.RX         = 1;
+
+
+    rst = 1;
+    @(posedge clk);
+    @(posedge clk);
+    @(posedge clk);
+    rst = 0;
+    @(posedge clk);
+/*
+    fork
+        uart_if0.write_tx_data(8'h55);
+        uart_if0.receive_tx_data(readed, valid);
+    join
+    uart_if0.wait_for_tx_complete();
+
+    uart_if0.transmit_rx_data(8'hAA);
+    uart_if0.wait_for_rx_complete();
+    uart_if0.read_rx_data(readed);
+*/
+//  #10us
+//  $display("\n%c[1;32m ******************** SIMULATION RUN FINISHED SUCCESSFULLY ********************%c[0m", 27, 27);
+//  $stop(2);
+end
+
+`endif //TB_ENVIRONMENT_STYLE
+
+`ifdef TB_SIMPLE_STYLE
 
 task trn_tx_data(input test_array_t din, output int counter, output done);
     done    = 0;
@@ -234,26 +315,25 @@ task rcv_rxc_count(input int number, output int counter, output done);
 endtask
 
 
-always #(CLOCK_PERIOD_ns/2) clk = ~clk;
-
 initial begin
-    bit_period    = 0;
+    bit_period       = 0;
     //
-    control.TXEN  = 0;
-    control.RXEN  = 0;
-    control.TXCIE = 0;
-    control.RXCIE = 0;
-    control.UDRIE = 0;
+    control.TXEN     = 0;
+    control.RXEN     = 0;
+    control.TXCIE    = 0;
+    control.RXCIE    = 0;
+    control.TXDREIE  = 0;   // TX Data Register Empty Interrupt Enable
+    control.RXDRNEIE = 0;   // RX Data Register Not Empty Interrupt Enable
     //
-    RX            = 1;
+    RX               = 1;
     //
-    tx_din        = 0;
-    tx_valid      = 0;
-    rx_ready      = 0;
+    tx_din           = 0;
+    tx_valid         = 0;
+    rx_ready         = 0;
     //
     for (int i = 0; i < TEST_ARRAY_SIZE; i = i+1) begin
-        src_data[i] = i+1;
-        dst_data[i] = 0;
+        src_data[i]  = i+1;
+        dst_data[i]  = 0;
     end
 
 //  rst = 1;
@@ -323,7 +403,12 @@ initial begin
     $stop(2);
 end 
 
-/*
+`endif //TB_SIMPLE_STYLE
+
+`ifdef TB_SYN_STYLE
+
+assign RX = TX;
+
 always_ff @(posedge clk) begin
     rst         <= 1;
     rst_counter <= rst_counter - 1;
@@ -332,8 +417,8 @@ always_ff @(posedge clk) begin
         rst             <= 0;
     end
 end
-*/
-/*
+
+
 always_ff @(posedge clk, posedge rst) begin
     if(rst) begin
         for (int i = 0; i < 10; i = i+1) begin
@@ -384,14 +469,51 @@ always_ff @(posedge clk, posedge rst) begin
         end
     end
 end
-*/
+
+`endif //TB_SYN_STYLE
+
 
 //------------------------------------------------------------------------------
 //
 //    Instances
 //
-uart uart_inst
-(
+
+`ifdef TB_ENVIRONMENT_STYLE
+
+//uart_wrapper_wif uart_inst (
+//    .uif        ( uart_if0  )
+//    );
+
+uart    uart_inst
+(    .reset      ( uart_if0.reset      )
+    ,.clock      ( uart_if0.clock      )
+    // UART
+    ,.bit_period ( uart_if0.bit_period )
+    ,.control    ( uart_if0.control    )
+    ,.status     ( uart_if0.status     )
+    ,.TXCI       ( uart_if0.TXCI       )    // TX Complete Interrupt
+    ,.RXCI       ( uart_if0.RXCI       )    // RX Complete Interrupt
+    ,.TXDREI     ( uart_if0.TXDREI     )    // TX Data Register Empty Interrupt
+    ,.RXDRNEI    ( uart_if0.RXDRNEI    )    // RX Data Register Not Empty Interrupt
+    //
+    ,.tx_ready   ( uart_if0.tx_ready   )
+    ,.tx_din     ( uart_if0.tx_din     )
+    ,.tx_valid   ( uart_if0.tx_valid   )
+    //
+    ,.rx_ready   ( uart_if0.rx_ready   )
+    ,.rx_dout    ( uart_if0.rx_dout    )
+    ,.rx_valid   ( uart_if0.rx_valid   )
+    //
+    ,.TX         ( uart_if0.TX         )    // UART Transmit Data
+    ,.RX         ( uart_if0.RX         )    // UART Receive Data
+);
+
+
+`endif //TB_ENVIRONMENT_STYLE
+
+`ifndef TB_ENVIRONMENT_STYLE
+
+uart uart_inst  (
     .reset      ( rst        ),
     .clock      ( clk        ),
 
@@ -399,9 +521,10 @@ uart uart_inst
     .bit_period ( bit_period ),
     .control    ( control    ),
     .status     ( status     ),
-    .TXCI       ( TXCI       ),    // TX Complete Interrupt
-    .RXCI       ( RXCI       ),    // RX Complete Interrupt
-    .UDRI       ( UDRI       ),    // Data Register Empty Interrupt
+    .TXCI       ( TXCI       ),     // TX Complete Interrupt
+    .RXCI       ( RXCI       ),     // RX Complete Interrupt
+    .TXDREI     ( TXDREIE    ),     // TX Data Register Empty Interrupt
+    .RXDRNEI    ( RXDRNEIE   ),     // RX Data Register Not Empty Interrupt
     //
     .tx_ready   ( tx_ready   ),
     .tx_din     ( tx_din),
@@ -411,9 +534,11 @@ uart uart_inst
     .rx_dout    ( rx_dout    ),
     .rx_valid   ( rx_valid   ),
     //
-    .TX         ( TX         ),        // UART Transmit Data
-    .RX         ( RX         )        // UART Receive Data
-);
+    .TX         ( TX         ),     // UART Transmit Data
+    .RX         ( RX         )      // UART Receive Data
+    );
+
+`endif //TB_ENVIRONMENT_STYLE
 
 endmodule
 //-------------------------------------------------------------------------------
