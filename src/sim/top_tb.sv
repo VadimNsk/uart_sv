@@ -130,8 +130,8 @@ always #(CLOCK_PERIOD_ns/2) clk = ~clk;
 
 `ifdef TB_ENVIRONMENT_STYLE
 
-data_t readed;
-logic valid;
+//data_t readed;
+//logic valid;
 
 initial begin
     rst = 1;

@@ -6,30 +6,42 @@ import uart_pkg::*;
 
 class Transaction;
 
-    static int  errors = 0;
-    static bit  stop   = 0;
+    static int  errors     = 0;
+    static bit  stop       = 0;
 
     rand data_t din;
-         data_t tx_dout;
-         logic  tx_dout_valid = 0;
-         data_t rx_dout;
+         logic  din_valid  = 0;
+         data_t dout;
+         logic  dout_valid = 0;
 
     // Display transaction's inputs
     virtual function void display_inputs();
-        $display(" Transaction inputs: din = 0x%02h ", din);
+        if(din_valid)
+            $display("Transaction input: din = 0x%02h", din);
+        else
+            $display("Transaction input not valid");
     endfunction : display_inputs
     //
     virtual function string append_inputs();
-        $swrite(append_inputs, "din = 0x%02h ", din);
+        if(din_valid)
+            $swrite(append_inputs, " din = 0x%02h", din);
+        else
+            $swrite(append_inputs, " not valid");
     endfunction : append_inputs
 
     // Display transaction's outputs
     virtual function void display_outputs();
-        $display(" Transaction outputs: rx_dout = 0x%02h; tx_dout = 0x%02h; tx_dout_valid = %0b ", tx_dout, rx_dout, tx_dout_valid);
+        if(dout_valid)
+            $display("Transaction output: dout = 0x%02h", dout);
+        else
+            $display("Transaction output not valid");
     endfunction : display_outputs
     //
     virtual function string append_outputs();
-        $swrite(append_outputs, "rx_dout = 0x%02h; tx_dout = 0x%02h; tx_dout_valid = %0b ", tx_dout, rx_dout, tx_dout_valid);
+        if(dout_valid)
+            $swrite(append_outputs, " dout = 0x%02h", dout);
+        else
+            $swrite(append_outputs, " not valid");
     endfunction : append_outputs
 
     // Compare transactions
@@ -40,16 +52,14 @@ class Transaction;
             $display(" ** ERROR ** : trans : received a null object ");
             compare = 0;
         end else begin
-            if(!rtrans.tx_dout_valid) begin
-                $display(" ** ERROR **: trans : received data not valid");
-                compare = 0;
+            if(this.din_valid) begin
+                if(this.dout_valid && (this.din !== this.dout)) begin
+                    $display(" ** ERROR **: trans : dout did not match");
+                    compare = 0;
+                end
             end
-            if(rtrans.tx_dout !== this.din) begin
-                $display(" ** ERROR **: trans : tx_dout did not match");
-                compare = 0;
-            end
-            if(rtrans.rx_dout !== this.din) begin
-                $display(" ** ERROR **: trans : rx_dout did not match");
+            if((this.dout_valid && rtrans.dout_valid) && (this.dout !== rtrans.dout)) begin
+                $display(" ** ERROR **: trans : dout did not match");
                 compare = 0;
             end
         end

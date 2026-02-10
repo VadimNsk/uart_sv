@@ -3,7 +3,6 @@
 
 
 `include "transaction.sv"
-//`include "coverage.sv"
 `include "driver.sv"
 `include "receiver.sv"
 `include "scoreboard.sv"
@@ -17,13 +16,13 @@ class Environment ;
 
 
     Driver                 drvr;
-    Receiver               rcvr;
+    Receiver               rcvr[2];
     Scoreboard             sb;
     mailbox #(Transaction) drvr2sb;
-    mailbox #(Transaction) rcvr2sb;
+    mailbox #(Transaction) rcvr2sb[2];
 
 
-    function new(virtual uart_if.drv drv_intf_new ,
+    function new(virtual uart_if.drv drv_intf_new,
                  virtual uart_if.rcv rcv_intf_new);
         this.drv_intf = drv_intf_new;
         this.rcv_intf = rcv_intf_new;
@@ -33,11 +32,13 @@ class Environment ;
 
     function void build();
         $display(" %0d :  Environment  : start of build() method",$time);
-        drvr2sb = new(`NUM_OF_TRANS);
-        rcvr2sb = new(`NUM_OF_TRANS);
-        drvr    = new(drv_intf, drvr2sb);
-        sb      = new(drvr2sb,  rcvr2sb);
-        rcvr    = new(rcv_intf, rcvr2sb);
+        drvr2sb    = new(`NUM_OF_TRANS);
+        rcvr2sb[0] = new(`NUM_OF_TRANS);
+        rcvr2sb[1] = new(`NUM_OF_TRANS);
+        drvr       = new(drv_intf, drvr2sb);
+        sb         = new(drvr2sb,  rcvr2sb);
+        rcvr[0]    = new(rcv_intf, rcvr2sb[0], 0);
+        rcvr[1]    = new(rcv_intf, rcvr2sb[1], 1);
         $display(" %0d :  Environment  : end of build() method",$time);
     endfunction : build
 
@@ -79,7 +80,8 @@ class Environment ;
         $display(" %0d :  Environment  : start of start() method",$time);
         fork
             drvr.start();
-            rcvr.start();
+            rcvr[0].start();
+            rcvr[1].start();
         join
         sb.start();
         $display(" %0d :  Environment  : end of start() method",$time);

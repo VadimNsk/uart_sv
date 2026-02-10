@@ -6,8 +6,6 @@
 class Driver;
 
     virtual uart_if.drv    drv_intf;
-//  Transaction            trans_e;
-//  Coverage               cov      = new();
     mailbox #(Transaction) drvr2sb;
 
     // Constructor
@@ -15,7 +13,6 @@ class Driver;
                  mailbox #(Transaction) drvr2sb
                  );
         this.drv_intf = drv_intf_new;
-//      trans_e       = new();
         if(drvr2sb == null) begin
             $display(" **ERROR: drv2sb is null");
             $finish;
@@ -24,25 +21,23 @@ class Driver;
     endfunction : new
 
     task drive(Transaction trans);
-        @(posedge drv_intf.clock);
-        fork
-            drv_intf.write_tx_data(trans.din);
-            drv_intf.transmit_data_to_rx(trans.din);
-        join
-        drv_intf.wait_for_tx_complete();
+        drv_intf.transmit_data_to_rx(trans.din);
+        drv_intf.write_tx_data(trans.din);
+        drv_intf.wait_for_tx_complete(trans.stop);
     endtask : drive
 
     // Start method
     task start();
-//      Transaction trans = new trans_e;
         Transaction trans = new();
 
+        $display(" %0d :  Driver  : start of start() method",$time);
         repeat(`NUM_OF_TRANS) begin
             if (trans.randomize) begin
+                trans.din_valid = 1'b1;
                 trans.display_inputs();
                 drive(trans);
-//              cov.sample(trans);
                 drvr2sb.put(trans);
+                #1us;
             end else begin
                 $display (" %0d Driver : **ERROR: randomization failed",$time);
                 trans.errors++;
@@ -51,6 +46,7 @@ class Driver;
 
         @(posedge drv_intf.clock);
         trans.stop = 1;
+        $display(" %0d :  Driver  : end of start() method",$time);
     endtask : start
 
 endclass

@@ -75,8 +75,9 @@ interface uart_if (input logic clock, input logic reset);
         wait(tx_ready == 1'b1);
         tx_din   = data;
         tx_valid = 1'b1;
-        @(posedge drv.clock);
+        @(posedge clock);
         tx_valid = 1'b0;
+        @(posedge clock);
     endtask
 
     // TX data transmit to RX task
@@ -105,6 +106,7 @@ interface uart_if (input logic clock, input logic reset);
             #(TEST_BIT_PERIOD / 2);
             for (int i = 0; i < STARTBIT_WIDTH; i = i+1) begin
                 if(TX != 0) begin
+                    $display(" %0d :  uart_if  : Start bit is failed",$time);
                     err = 1;
                     break;
                 end
@@ -120,10 +122,11 @@ interface uart_if (input logic clock, input logic reset);
             end
             for (int i = 0; i < STOPBIT_WIDTH; i = i+1) begin
                 if(TX != 1'b1) begin
+                    $display(" %0d :  uart_if  : Stop bit is failed",$time);
                     err = 1;
                     break;
                 end
-                #TEST_BIT_PERIOD;
+                #(TEST_BIT_PERIOD / 2);
             end
             valid   = !err;
             break;
@@ -131,12 +134,15 @@ interface uart_if (input logic clock, input logic reset);
     endtask
 
     // RX data read task
-    task automatic read_rx_data(output data_t data);
+    task automatic read_rx_data(output data_t data, input logic stop);
         rx_ready = 1'b1;
-        wait(rx_valid == 1'b1);
-        data     = rx_dout;
-        @(posedge clock);
-        rx_ready = 1'b0;
+        wait(rx_valid == 1'b1 || stop);
+        if(!stop) begin
+            data     = rx_dout;
+            @(posedge clock);
+            rx_ready = 1'b0;
+            @(posedge clock);
+        end
     endtask
 
     // Check if TX is ready
@@ -157,15 +163,13 @@ interface uart_if (input logic clock, input logic reset);
     endtask
 
     // Wait for TX complete interrupt
-    task automatic wait_for_tx_complete();
-        wait(dut.status.TXC);
-        @(posedge dut.clock);
+    task automatic wait_for_tx_complete(input logic stop);
+        wait(dut.status.TXC || stop);
     endtask
 
     // Wait for RX complete interrupt
-    task automatic wait_for_rx_complete();
-        wait(dut.status.RXC);
-        @(posedge dut.clock);
+    task automatic wait_for_rx_complete(input logic stop);
+        wait(dut.status.RXC || stop);
     endtask
 
 
