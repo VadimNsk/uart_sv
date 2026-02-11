@@ -99,16 +99,17 @@ interface uart_if (input logic clock, input logic reset);
     // RX data receive from TX task
     task automatic receive_data_from_tx(output data_t data, output logic valid);
         logic err;
+//      $display(" %0d :  uart_if  : start of receive_data_from_tx() method",$time);
 
         while(1) begin
             err = 0;
             wait(TX == 1'b0);
             #(TEST_BIT_PERIOD / 2);
             for (int i = 0; i < STARTBIT_WIDTH; i = i+1) begin
+//              $display(" %0d :  uart_if  : Start bit",$time);
                 if(TX != 0) begin
                     $display(" %0d :  uart_if  : Start bit is failed",$time);
                     err = 1;
-                    break;
                 end
                 #TEST_BIT_PERIOD;
             end
@@ -117,18 +118,26 @@ interface uart_if (input logic clock, input logic reset);
                 continue;
             end
             for(int i = 0; i < DATA_WIDTH; i = i+1) begin
+//              $display(" %0d :  uart_if  : data[%d] = %d",$time, i, TX);
                 data[i] = TX;
                 #TEST_BIT_PERIOD;
             end
             for (int i = 0; i < STOPBIT_WIDTH; i = i+1) begin
+//              $display(" %0d :  uart_if  : Stop bit",$time);
                 if(TX != 1'b1) begin
                     $display(" %0d :  uart_if  : Stop bit is failed",$time);
                     err = 1;
-                    break;
                 end
-                #(TEST_BIT_PERIOD / 2);
+                if(i < STOPBIT_WIDTH-1)
+                    #(TEST_BIT_PERIOD);
+                else
+                    #(TEST_BIT_PERIOD / 2 - 10);    // a short distance from the end
             end
             valid   = !err;
+            if(err) begin
+                err = 0;
+                continue;
+            end
             break;
         end;
     endtask
@@ -164,12 +173,12 @@ interface uart_if (input logic clock, input logic reset);
 
     // Wait for TX complete interrupt
     task automatic wait_for_tx_complete(input logic stop);
-        wait(dut.status.TXC || stop);
+        wait(dut.status.TXC || stop);   // the stop signal did not lead to a stop
     endtask
 
     // Wait for RX complete interrupt
     task automatic wait_for_rx_complete(input logic stop);
-        wait(dut.status.RXC || stop);
+        wait(dut.status.RXC || stop);   // the stop signal did not lead to a stop
     endtask
 
 

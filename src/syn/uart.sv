@@ -154,7 +154,7 @@ always_ff @(posedge clock, posedge reset) begin
         if(uart_trn_ready && uart_trn_valid) begin
             uart_trn_valid <= 0;
         end
-        
+
         if(!uart_trn_enable) begin
             uart_trn_enable <= control.TXEN;        // Transmitter Enable
         end
@@ -167,7 +167,7 @@ always_ff @(posedge clock, posedge reset) begin
                     tx_UDR_valid   <= 0;
                 end
             end
-            
+
             if(tx_valid && !tx_UDR_valid) begin
                 tx_UDR       <= tx_din;
                 tx_UDR_valid <= tx_valid;
@@ -185,38 +185,38 @@ end
 
 always_ff @(posedge clock, posedge reset) begin
     if(reset) begin
-        rx_UDR             <= 0;       // UART I/O Data Register
+        rx_UDR             <= 0;        // UART I/O Data Register
         rx_UDR_valid       <= 0;
         //
         uart_rcv_ready     <= 0;
         //
-        status_DOR         <= 0;       // UART Data OverRun
+        status_DOR         <= 0;        // UART Data OverRun
         //
         prev_status_RXC    <= 0;
-        RXCI_reg           <= 0;       // RX Complete Interrupt
+        RXCI_reg           <= 0;        // RX Complete Interrupt
         //
         prev_status_RXDRNE <= 0;
-        RXDRNEI_reg        <= 0;       // RX Data Register Not Empty Interrupt
+        RXDRNEI_reg        <= 0;        // RX Data Register Not Empty Interrupt
     end
     else begin
         uart_rcv_ready  <= 1;
 
         // detecting the signal edge
-        RXCI_reg     <= 0;
+        RXCI_reg        <= 0;
         prev_status_RXC <= status.RXC;
         if({prev_status_RXC, status.RXC} == 2'b01 && control.RXCIE)
-            RXCI_reg <= 1;          // RX Complete Interrupt
+            RXCI_reg    <= 1;           // RX Complete Interrupt
 
         // detecting the signal edge
-        RXDRNEI_reg     <= 0;
+        RXDRNEI_reg        <= 0;
         prev_status_RXDRNE <= status.RXDRNE;
         if({prev_status_RXDRNE, status.RXDRNE} == 2'b01 && control.RXDRNEIE)
-            RXDRNEI_reg <= 1;       // RX Data Register Not Empty Interrupt
+            RXDRNEI_reg    <= 1;        // RX Data Register Not Empty Interrupt
 
         // the data from the output must be read within 1 clock cycle
         if(rx_ready && rx_UDR_valid) begin
             rx_UDR_valid <= 0;
-            status_DOR   <= 0;      // resetting the data overflow flag when reading data
+            status_DOR   <= 0;          // resetting the data overflow flag when reading data
         end
 
         if(uart_rcv_valid) begin

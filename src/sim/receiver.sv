@@ -29,7 +29,7 @@ class Receiver;
             rcv_intf.read_rx_data(trans.dout, trans.stop);
             if(!trans.stop) begin
                 trans.dout_valid = 1'b1;
-                $display(" %0d : %sync received data 0x%02h", $time, (sync) ? "S":"As", trans.dout);
+//              $display(" %0d : %sync received data 0x%02h", $time, (sync) ? "S":"As", trans.dout);
             end
         end
     endtask

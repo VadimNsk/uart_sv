@@ -32,25 +32,23 @@ module automatic uart_trn
 //
 //    Settings
 //
-localparam SHIFTER_WIDTH   = DATA_WIDTH+2;
+localparam SHIFTER_WIDTH   = STOPBIT_WIDTH+DATA_WIDTH+STARTBIT_WIDTH;
 
-localparam IDLE_STATE      = 0;
-localparam START_STATE     = 1;
-localparam START_BIT_STATE = 2;
-localparam TRN_BIT0_STATE  = 3;
-localparam TRN_BITn_STATE  = TRN_BIT0_STATE+DATA_WIDTH-1;
-localparam STOP_BIT_STATE  = TRN_BITn_STATE+1;
-//
-localparam STATES_NUM      = STOP_BIT_STATE + 1;
-localparam STATE_WIDTH     = $clog2(STATES_NUM);
+localparam STATE_CNT_WIDTH = $clog2(SHIFTER_WIDTH);
+
 
 //------------------------------------------------------------------------------
 //
 //    Types
 //
-typedef logic [  STATE_WIDTH-1:0] state_t;
+typedef enum { IDLE_STATE,
+               START_STATE,
+               STARTBIT_STATE,
+               TRN_DATA_STATE,
+               STOPBIT_STATE }      state_t;
+typedef logic [STATE_CNT_WIDTH-1:0] state_cnt_t;
+typedef logic [  SHIFTER_WIDTH-1:0] shifter_t;
 
-typedef logic [SHIFTER_WIDTH-1:0] shifter_t;
 
 //------------------------------------------------------------------------------
 //
@@ -58,10 +56,13 @@ typedef logic [SHIFTER_WIDTH-1:0] shifter_t;
 //
 
 state_t      state       = IDLE_STATE;
+state_cnt_t  state_cnt   = 0;
+
 logic        strobe_en   = 0;
 bit_period_t bit_prd_reg = 0;
 bit_period_t bit_cnt     = 0;
 logic        bit_strobe  = 0;
+
 shifter_t    shifter     = '1;
 
 logic        ready_reg   = 0;
@@ -108,12 +109,20 @@ end
 
 
 always_ff @(posedge clock, posedge reset) begin
+    assert (STARTBIT_WIDTH > 0)
+        else $error("Error: STARTBIT_WIDTH is null");
+    assert (DATA_WIDTH > 0)
+        else $error("Error: DATA_WIDTH is null");
+    assert (STOPBIT_WIDTH > 0)
+        else $error("Error: STOPBIT_WIDTH is null");
+
     if(reset) begin
         bit_prd_reg <= 1;
         strobe_en   <= 0;
         state       <= IDLE_STATE;
+        state_cnt   <= 0;
         TXD_reg     <= 1;
-        shifter     <= -1;
+        shifter     <= '1;
         ready_reg   <= 0;
         TXC_reg     <= 0;
     end
@@ -123,9 +132,9 @@ always_ff @(posedge clock, posedge reset) begin
             shifter <= {1'b1, shifter[SHIFTER_WIDTH-1:1]};
         end
 
-        // Состояние автомата действует на протяжении передачи бита.
-        // Т.е. состояние START_BIT_STATE действует до строба переключения на передачу 0-го бита,
-        // а состояние STOP_BIT_STATE действует до конца стопбита, т.е. до окончания транзакции
+        // The state of the machine is valid during the transmission of the bit.
+        // That is, the STARTBIT_STATE state is valid until the gate switches to transmitting the 0th bit,
+        // and the STOP_BIT_STATE state is valid until the end of the stopbit, i.e. until the end of the transaction.
         case(state)
             IDLE_STATE: begin
                 strobe_en   <= 0;
@@ -135,36 +144,56 @@ always_ff @(posedge clock, posedge reset) begin
                 if(valid && ready_reg) begin
                     state     <= START_STATE;
                     strobe_en <= 1;
-
-                    shifter   <= {-1, din, 1'b0};
+                    shifter   <= {{STOPBIT_WIDTH{1'b1}}, din, {STARTBIT_WIDTH{1'b0}}};
                     ready_reg <= 0;
                     TXC_reg   <= 0;
                 end
             end
             //
-            STOP_BIT_STATE:
+            START_STATE: begin
                 if(bit_strobe) begin
-                    state     <= IDLE_STATE;
-                    strobe_en <= 0;
-                    TXC_reg   <= 1;
+                    state     <= STARTBIT_STATE;
+                    state_cnt <= STARTBIT_WIDTH-1;
                 end
+            end
             //
-            default: begin
+            STARTBIT_STATE: begin
                 if(bit_strobe) begin
-                    state         <= state + 1;
-                    if(state == STOP_BIT_STATE) begin
-                        state     <= IDLE_STATE;
-                        strobe_en <= 0;
+                    state_cnt <= state_cnt - 1;
+                    if(state_cnt == 0) begin
+                        state     <= TRN_DATA_STATE;
+                        state_cnt <= DATA_WIDTH-1;
                     end
                 end
-                // Если сбой работы командного автомата и выход за диапазон допустимых состояний
-                assert (state <= STOP_BIT_STATE)
-                    else $error("Error: state = %0d is failed at time %0t", state, $time);
-                if(state > STOP_BIT_STATE) begin
-                    state     <= IDLE_STATE;
-                    strobe_en <= 0;
-                    TXD_reg   <= 1;
+            end
+            //
+            TRN_DATA_STATE: begin
+                if(bit_strobe) begin
+                    state_cnt <= state_cnt - 1;
+                    if(state_cnt == 0) begin
+                        state     <= STOPBIT_STATE;
+                        state_cnt <= STOPBIT_WIDTH;
+                    end
                 end
+            end
+            //
+            STOPBIT_STATE: begin
+                if(bit_strobe) begin
+                    state_cnt <= state_cnt - 1;
+                    if(state_cnt == 0) begin
+                        state     <= IDLE_STATE;
+                        strobe_en <= 0;
+                        TXC_reg   <= 1;
+                    end
+                end
+            end
+            //
+            default: begin
+                assert (state <= STOPBIT_STATE)
+                    else $error("Error: state = %0d is failed at time %0t", state, $time);
+                state     <= IDLE_STATE;
+                strobe_en <= 0;
+                TXD_reg   <= 1;
             end
         endcase
     end
